@@ -1,6 +1,8 @@
 import re
 import mysql.connector
 from mysql.connector import Error
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 db = mysql.connector.connect(
     host="localhost",
@@ -9,6 +11,7 @@ db = mysql.connector.connect(
     database="movie_db"
 )
 cur = db.cursor()
+
 
 def show(proc, args):
     cur.callproc(proc, args)
@@ -25,12 +28,38 @@ def show(proc, args):
         print("  No results found.")
     db.commit()
 
+
+def find_movie():
+    title = input("Movie title (or part of it): ").strip()
+    if not title:
+        return None
+    cur.execute(
+        "SELECT movie_id, title, release_year FROM movies "
+        "WHERE title LIKE %s ORDER BY title",
+        (f"%{title}%",)
+    )
+    rows = cur.fetchall()
+    if not rows:
+        print("  No movies found.")
+        return None
+    for mid, t, y in rows:
+        print(f"  [{mid}] {t} ({y})")
+    if len(rows) == 1:
+        return rows[0][0]
+    try:
+        return int(input("Enter the movie id: "))
+    except ValueError:
+        print("  Invalid id.")
+        return None
+
+
 COUNTRIES = {
     "indian": "India", "india": "India",
-    "american": "United States", "usa": "United States", "us":"United States",
+    "american": "United States", "usa": "United States",
     "korean": "South Korea", "japanese": "Japan",
     "british": "United Kingdom", "australian": "Australia"
 }
+
 
 def parse(text):
     t = text.lower()
@@ -43,6 +72,7 @@ def parse(text):
             None,
             float(rating.group(1)) if rating else None,
             None)
+
 
 print("=== Voir: Movie Database Console ===")
 while True:
@@ -60,13 +90,16 @@ while True:
         elif choice == "2":
             show("get_movies_by_director", (input("Director name: "),))
         elif choice == "3":
-            show("add_review", (
-                int(input("Movie id: ")),
-                int(input("Reviewer id: ")),
-                float(input("Rating (0.5-5.0): ")),
-                input("Review text: ")))
+            mid = find_movie()
+            if mid:
+                show("add_review", (
+                    mid,
+                    int(input("Reviewer id: ")),
+                    float(input("Rating (0.5-5.0): ")),
+                    input("Review text: ")
+                ))
         elif choice == "4":
-            print("Happy Watching!")
+            print("Happy Movie Watching!")
             break
         else:
             print("Invalid choice.")
