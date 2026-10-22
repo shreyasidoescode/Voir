@@ -1,5 +1,5 @@
 USE movie_db;
---procedures and triggers
+--Procedures
 	CREATE TABLE IF NOT EXISTS movie_rating_cache (
 		movie_id INT PRIMARY KEY,
 		review_count INT NOT NULL DEFAULT 0,
@@ -139,16 +139,11 @@ BEGIN
     SELECT 'SUCCESS' AS status, v_id AS new_movie_id;
 END //
 
+--Triggers
 DELIMITER ;
 
-USE movie_db;
 DROP TRIGGER IF EXISTS trg_movies_bi;
-DROP TRIGGER IF EXISTS trg_movies_bu;
-DROP TRIGGER IF EXISTS trg_movies_ad;
 DROP TRIGGER IF EXISTS trg_reviews_bi;
-DROP TRIGGER IF EXISTS trg_reviews_ai;
-DROP TRIGGER IF EXISTS trg_reviews_au;
-DROP TRIGGER IF EXISTS trg_reviews_ad;
 
 DELIMITER //
 
@@ -158,24 +153,8 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Release year is too far in the future';
     END IF;
     IF NEW.release_date IS NOT NULL AND YEAR(NEW.release_date) <> NEW.release_year THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'release_date does not match release_year';
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Release date does not match release year';
     END IF;
-END //
-
-CREATE TRIGGER trg_movies_bu BEFORE UPDATE ON movies FOR EACH ROW
-BEGIN
-    IF NEW.release_year > YEAR(CURDATE()) + 1 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Release year is too far in the future';
-    END IF;
-    IF NEW.release_date IS NOT NULL AND YEAR(NEW.release_date) <> NEW.release_year THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'release_date does not match release_year';
-    END IF;
-END //
-
-CREATE TRIGGER trg_movies_ad AFTER DELETE ON movies FOR EACH ROW
-BEGIN
-    INSERT INTO movie_audit (movie_id, title, release_year, deleted_by)
-    VALUES (OLD.movie_id, OLD.title, OLD.release_year, USER());
 END //
 
 CREATE TRIGGER trg_reviews_bi BEFORE INSERT ON reviews FOR EACH ROW
@@ -187,27 +166,6 @@ BEGIN
                WHERE movie_id = NEW.movie_id AND reviewer_id = NEW.reviewer_id) THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Reviewer has already reviewed this movie';
     END IF;
-END //
-
-CREATE TRIGGER trg_reviews_ai AFTER INSERT ON reviews FOR EACH ROW
-BEGIN
-    REPLACE INTO movie_rating_cache (movie_id, review_count, average_rating)
-    SELECT NEW.movie_id, COUNT(*), ROUND(AVG(rating), 2)
-    FROM reviews WHERE movie_id = NEW.movie_id;
-END //
-
-CREATE TRIGGER trg_reviews_au AFTER UPDATE ON reviews FOR EACH ROW
-BEGIN
-    REPLACE INTO movie_rating_cache (movie_id, review_count, average_rating)
-    SELECT NEW.movie_id, COUNT(*), ROUND(AVG(rating), 2)
-    FROM reviews WHERE movie_id = NEW.movie_id;
-END //
-
-CREATE TRIGGER trg_reviews_ad AFTER DELETE ON reviews FOR EACH ROW
-BEGIN
-    REPLACE INTO movie_rating_cache (movie_id, review_count, average_rating)
-    SELECT OLD.movie_id, COUNT(*), ROUND(AVG(rating), 2)
-    FROM reviews WHERE movie_id = OLD.movie_id;
 END //
 
 DELIMITER ;
